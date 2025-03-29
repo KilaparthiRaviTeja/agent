@@ -1,0 +1,7 @@
+# Ignore Python cache and environment files
+ai-agent-backend/__pycache__/
+ai-agent-backend/.env
+
+# Ignore Node.js dependencies
+front/node_modules/
+front/.env
