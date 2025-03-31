@@ -9,27 +9,28 @@ from bson.errors import InvalidId
 from datetime import datetime, timedelta
 from typing import Optional
 import os
+from fastapi.encoders import jsonable_encoder
 
 app = FastAPI()
 
-# ✅ CORS Middleware
+# ✅ CORS Middleware - Specify allowed origins in production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change this to your frontend domain for security
+    allow_origins=["*"],  # 🔹 Change to specific frontend domain in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ✅ MongoDB Connection
-MONGO_URI = "mongodb+srv://ravi:ravi@cluster0.bdi0mhr.mongodb.net/?retryWrites=true&w=majority"
+MONGO_URI="mongodb+srv://ravi:bunny@cluster0.m6iwsdt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = client["app_db"]
 applications_collection = db["applications"]
 
 @app.get("/")
 def home():
-    return {"message": "FastAPI + MongoDB Atlas is running!"}
+    return {"message": "FastAPI + MongoDB is running!"}
 
 # ✅ Mount static files (for favicon)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -44,8 +45,8 @@ async def favicon():
 class ApplicationInput(BaseModel):
     first_name: str
     last_name: str
-    date_of_birth: str  
-    ssn_last4: str  
+    date_of_birth: str  # YYYY-MM-DD format
+    ssn_last4: str  # Only last 4 digits
     address: str
 
 class Application(ApplicationInput):
@@ -60,11 +61,11 @@ def calculate_eta(submission_date: str, status: str):
     try:
         submission_datetime = datetime.strptime(submission_date, "%Y-%m-%d")
     except ValueError:
-        raise ValueError(f"Invalid date format: {submission_date}. Expected format: YYYY-MM-DD.")
+        raise ValueError("Invalid date format. Expected: YYYY-MM-DD.")
     
     if status in ["Approved", "Rejected"]:
         return 0, None  
-    
+
     today = datetime.utcnow()
     days_since_submission = (today - submission_datetime).days
     approval_eta = 5 if days_since_submission <= 3 else 3
@@ -73,8 +74,6 @@ def calculate_eta(submission_date: str, status: str):
     return approval_eta, approval_estimated_date.strftime("%Y-%m-%d")
 
 # ✅ Create Application (POST)
-from fastapi.encoders import jsonable_encoder
-
 @app.post("/applications/")
 async def create_application(app: ApplicationInput):
     try:
@@ -96,7 +95,7 @@ async def create_application(app: ApplicationInput):
         # Convert ObjectId to string before returning
         app_dict["_id"] = str(result.inserted_id)
 
-        return jsonable_encoder(app_dict)  # ✅ Ensure JSON serialization
+        return jsonable_encoder(app_dict)  # ✅ JSON serialization
     
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -122,7 +121,7 @@ async def get_application(app_id: str):
         raise HTTPException(status_code=404, detail="Application not found")
     
     app["_id"] = str(app["_id"])
-    return app
+    return jsonable_encoder(app)
 
 # ✅ Update Application (PUT)
 @app.put("/applications/{app_id}")
@@ -170,4 +169,4 @@ async def delete_application(app_id: str):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    return {"message": "Application deleted successfully"} 
+    return {"message": "Application deleted successfully"}
