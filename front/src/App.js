@@ -50,7 +50,6 @@ const ApplicationForm = () => {
 
     setFormData({ ...formData, [name]: value });
 
-    // Clear field error when corrected
     if (errors[name]) {
       setErrors((prevErrors) => ({ ...prevErrors, [name]: undefined }));
     }
@@ -98,6 +97,10 @@ const ApplicationForm = () => {
     }
   };
 
+  const clearSubmission = () => {
+    setResponse(null);
+  };
+
   return (
     <div className="main-container">
       <div className="container">
@@ -113,7 +116,7 @@ const ApplicationForm = () => {
             className={errors.first_name ? "input-error" : ""}
             required
           />
-          {errors.first_name && <p className="error-text" aria-live="polite">{errors.first_name}</p>}
+          {errors.first_name && <p className="error-text">{errors.first_name}</p>}
 
           <input
             type="text"
@@ -124,7 +127,7 @@ const ApplicationForm = () => {
             className={errors.last_name ? "input-error" : ""}
             required
           />
-          {errors.last_name && <p className="error-text" aria-live="polite">{errors.last_name}</p>}
+          {errors.last_name && <p className="error-text">{errors.last_name}</p>}
 
           <input
             type="date"
@@ -134,7 +137,7 @@ const ApplicationForm = () => {
             className={errors.date_of_birth ? "input-error" : ""}
             required
           />
-          {errors.date_of_birth && <p className="error-text" aria-live="polite">{errors.date_of_birth}</p>}
+          {errors.date_of_birth && <p className="error-text">{errors.date_of_birth}</p>}
 
           <input
             ref={ssnRef}
@@ -148,7 +151,7 @@ const ApplicationForm = () => {
             className={errors.ssn_last4 ? "input-error" : ""}
             required
           />
-          {errors.ssn_last4 && <p className="error-text" aria-live="polite">{errors.ssn_last4}</p>}
+          {errors.ssn_last4 && <p className="error-text">{errors.ssn_last4}</p>}
 
           <input
             type="text"
@@ -159,11 +162,16 @@ const ApplicationForm = () => {
             className={errors.address ? "input-error" : ""}
             required
           />
-          {errors.address && <p className="error-text" aria-live="polite">{errors.address}</p>}
+          {errors.address && <p className="error-text">{errors.address}</p>}
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Submitting..." : "Submit"}
-          </button>
+          <div className="button-group">
+            <button type="submit" disabled={loading}>
+              {loading ? "Submitting..." : "Submit"}
+            </button>
+            <button type="button" className="clear-button" onClick={clearSubmission}>
+              Clear
+            </button>
+          </div>
         </form>
       </div>
 
@@ -193,7 +201,7 @@ const ApplicationForm = () => {
         </div>
       )}
 
-      {errorMessage && <p className="error-text" aria-live="polite">{errorMessage}</p>}
+      {errorMessage && <p className="error-text">{errorMessage}</p>}
     </div>
   );
 };
