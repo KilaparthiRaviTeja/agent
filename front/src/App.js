@@ -49,9 +49,12 @@ const ApplicationForm = () => {
     }
 
     setFormData({ ...formData, [name]: value });
+
+    // Clear field error when corrected
     if (errors[name]) {
-      validateForm();
+      setErrors((prevErrors) => ({ ...prevErrors, [name]: undefined }));
     }
+
     if (name === "ssn_last4" && value.length === 4) {
       ssnRef.current?.blur();
     }
@@ -63,7 +66,7 @@ const ApplicationForm = () => {
       setErrorMessage("Please fix the errors before submitting.");
       return;
     }
-    setShowModal(true);
+    if (!showModal) setShowModal(true);
   };
 
   const confirmSubmission = async () => {
@@ -79,9 +82,12 @@ const ApplicationForm = () => {
         body: JSON.stringify(formData),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || `Error: ${res.status}`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || `Error: ${res.status}`);
+      }
 
+      const data = await res.json();
       setResponse(data);
       setFormData({ first_name: "", last_name: "", date_of_birth: "", ssn_last4: "", address: "" });
     } catch (err) {
@@ -97,22 +103,67 @@ const ApplicationForm = () => {
       <div className="container">
         <h2>Application Form</h2>
         <form onSubmit={handleSubmit} className="form">
-          <input ref={firstNameRef} type="text" name="first_name" placeholder="First Name" value={formData.first_name} onChange={handleChange} className={errors.first_name ? "input-error" : ""} required />
-          {errors.first_name && <p className="error-text">{errors.first_name}</p>}
+          <input
+            ref={firstNameRef}
+            type="text"
+            name="first_name"
+            placeholder="First Name"
+            value={formData.first_name}
+            onChange={handleChange}
+            className={errors.first_name ? "input-error" : ""}
+            required
+          />
+          {errors.first_name && <p className="error-text" aria-live="polite">{errors.first_name}</p>}
 
-          <input type="text" name="last_name" placeholder="Last Name" value={formData.last_name} onChange={handleChange} className={errors.last_name ? "input-error" : ""} required />
-          {errors.last_name && <p className="error-text">{errors.last_name}</p>}
+          <input
+            type="text"
+            name="last_name"
+            placeholder="Last Name"
+            value={formData.last_name}
+            onChange={handleChange}
+            className={errors.last_name ? "input-error" : ""}
+            required
+          />
+          {errors.last_name && <p className="error-text" aria-live="polite">{errors.last_name}</p>}
 
-          <input type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleChange} className={errors.date_of_birth ? "input-error" : ""} required />
-          {errors.date_of_birth && <p className="error-text">{errors.date_of_birth}</p>}
+          <input
+            type="date"
+            name="date_of_birth"
+            value={formData.date_of_birth}
+            onChange={handleChange}
+            className={errors.date_of_birth ? "input-error" : ""}
+            required
+          />
+          {errors.date_of_birth && <p className="error-text" aria-live="polite">{errors.date_of_birth}</p>}
 
-          <input ref={ssnRef} type="text" name="ssn_last4" placeholder="Last 4 digits of SSN" value={formData.ssn_last4} onChange={handleChange} maxLength="4" className={errors.ssn_last4 ? "input-error" : ""} required />
-          {errors.ssn_last4 && <p className="error-text">{errors.ssn_last4}</p>}
+          <input
+            ref={ssnRef}
+            type="text"
+            name="ssn_last4"
+            placeholder="Last 4 digits of SSN"
+            value={formData.ssn_last4}
+            onChange={handleChange}
+            maxLength={4}
+            pattern="\d{4}"
+            className={errors.ssn_last4 ? "input-error" : ""}
+            required
+          />
+          {errors.ssn_last4 && <p className="error-text" aria-live="polite">{errors.ssn_last4}</p>}
 
-          <input type="text" name="address" placeholder="Address" value={formData.address} onChange={handleChange} className={errors.address ? "input-error" : ""} required />
-          {errors.address && <p className="error-text">{errors.address}</p>}
+          <input
+            type="text"
+            name="address"
+            placeholder="Address"
+            value={formData.address}
+            onChange={handleChange}
+            className={errors.address ? "input-error" : ""}
+            required
+          />
+          {errors.address && <p className="error-text" aria-live="polite">{errors.address}</p>}
 
-          <button type="submit" disabled={loading}>{loading ? "Submitting..." : "Submit"}</button>
+          <button type="submit" disabled={loading}>
+            {loading ? "Submitting..." : "Submit"}
+          </button>
         </form>
       </div>
 
@@ -141,6 +192,8 @@ const ApplicationForm = () => {
           </div>
         </div>
       )}
+
+      {errorMessage && <p className="error-text" aria-live="polite">{errorMessage}</p>}
     </div>
   );
 };
