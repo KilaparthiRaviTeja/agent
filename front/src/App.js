@@ -80,7 +80,7 @@ const ApplicationForm = () => {
     setHasSubmitted(true);
 
     try {
-      const res = await fetch("http://localhost:8000/applications/", {
+      const res = await fetch("https://agent-rl7n.onrender.com/applications/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
