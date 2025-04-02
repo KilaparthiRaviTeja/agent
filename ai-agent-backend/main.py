@@ -1,71 +1,67 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import motor.motor_asyncio
 from bson import ObjectId
 from bson.errors import InvalidId
 from datetime import datetime, timedelta
 from typing import Optional
-import os
-from fastapi.encoders import jsonable_encoder
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 app = FastAPI()
 
-# ✅ CORS Middleware - Specify allowed origins in production
+# ✅ CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 🔹 Change to specific frontend domain in production
+     allow_origins=["*"],  # Adjust this for security
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ✅ MongoDB Connection
-MONGO_URI="mongodb+srv://ravi:bunny@cluster0.m6iwsdt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGO_URI = "mongodb+srv://ravi:bunny@cluster0.m6iwsdt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = client["app_db"]
 applications_collection = db["applications"]
 
 @app.get("/")
 def home():
-    return {"message": "FastAPI + MongoDB is running!"}
+    return {"message": "FastAPI with MongoDB is running!"}
 
-# ✅ Mount static files (for favicon)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# ✅ Serve the favicon
-@app.get("/favicon.ico", include_in_schema=False)
-async def favicon():
-    favicon_path = os.path.join("static", "favicon.ico")
-    return FileResponse(favicon_path)
-
-# ✅ Application Data Model
+# ✅ Data Models
 class ApplicationInput(BaseModel):
     first_name: str
     last_name: str
-    date_of_birth: str  # YYYY-MM-DD format
-    ssn_last4: str  # Only last 4 digits
+    date_of_birth: str
+    ssn_last4: str
+    income: float
     address: str
+    is_enrolled_in_program: bool = False
+    program_name: Optional[str] = None
+    household_size: int
 
 class Application(ApplicationInput):
-    submission_date: str  
+    submission_date: str
     status: str
-    approval_eta: Optional[int]  
-    approval_estimated_date: Optional[str]  
-    approval_date: Optional[str]  
+    approval_eta: Optional[int]
+    approval_estimated_date: Optional[str]
+    approval_date: Optional[str]
 
-# ✅ Function to Calculate ETA & Estimated Approval Date
+class UpdateApplicationRequest(BaseModel):
+    status: str
+
+# ✅ Function to Calculate ETA
 def calculate_eta(submission_date: str, status: str):
     try:
         submission_datetime = datetime.strptime(submission_date, "%Y-%m-%d")
     except ValueError:
-        raise ValueError("Invalid date format. Expected: YYYY-MM-DD.")
+        raise ValueError(f"Invalid date format: {submission_date}. Expected format: YYYY-MM-DD.")
     
     if status in ["Approved", "Rejected"]:
-        return 0, None  
-
+        return 0, None
+    
     today = datetime.utcnow()
     days_since_submission = (today - submission_datetime).days
     approval_eta = 5 if days_since_submission <= 3 else 3
@@ -73,8 +69,16 @@ def calculate_eta(submission_date: str, status: str):
     
     return approval_eta, approval_estimated_date.strftime("%Y-%m-%d")
 
-# ✅ Create Application (POST)
-@app.post("/applications/")
+# ✅ 1. Get All Applications (Admin)
+@app.get("/applications/")
+async def get_applications():
+    applications = await applications_collection.find().to_list(length=100)
+    for app in applications:
+        app["_id"] = str(app["_id"])
+    return applications
+
+# ✅ 2. Create a New Application (User)
+@app.post("/applications/", response_model=Application)
 async def create_application(app: ApplicationInput):
     try:
         submission_date = datetime.utcnow().strftime("%Y-%m-%d")
@@ -90,25 +94,18 @@ async def create_application(app: ApplicationInput):
             "approval_date": None
         })
 
-        result = await applications_collection.insert_one(app_dict)
+        if app.is_enrolled_in_program and not app.program_name:
+            raise HTTPException(status_code=400, detail="Program name is required if enrolled.")
 
-        # Convert ObjectId to string before returning
+        result = await applications_collection.insert_one(app_dict)
         app_dict["_id"] = str(result.inserted_id)
 
-        return jsonable_encoder(app_dict)  # ✅ JSON serialization
+        return app_dict
     
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# ✅ Get All Applications (GET)
-@app.get("/applications/")
-async def get_applications():
-    applications = await applications_collection.find().to_list(length=100)
-    for app in applications:
-        app["_id"] = str(app["_id"])  # ✅ Convert ObjectId to string
-    return jsonable_encoder(applications)
-
-# ✅ Get Single Application by ID (GET)
+# ✅ 3. Get a Single Application
 @app.get("/applications/{app_id}")
 async def get_application(app_id: str):
     try:
@@ -121,9 +118,9 @@ async def get_application(app_id: str):
         raise HTTPException(status_code=404, detail="Application not found")
     
     app["_id"] = str(app["_id"])
-    return jsonable_encoder(app)
+    return app
 
-# ✅ Update Application (PUT)
+# ✅ 4. Update Application Status (Admin)
 @app.put("/applications/{app_id}")
 async def update_application(app_id: str, status: str):
     try:
@@ -137,7 +134,6 @@ async def update_application(app_id: str, status: str):
 
     submission_date = application.get("submission_date", datetime.utcnow().strftime("%Y-%m-%d"))
     approval_eta, approval_estimated_date = calculate_eta(submission_date, status)
-
     approval_date = datetime.utcnow().strftime("%Y-%m-%d") if status == "Approved" else None
 
     update_data = {
@@ -148,16 +144,12 @@ async def update_application(app_id: str, status: str):
     }
 
     await applications_collection.update_one({"_id": obj_id}, {"$set": update_data})
-
     updated_application = await applications_collection.find_one({"_id": obj_id})
-    updated_application["_id"] = str(updated_application["_id"])  # Convert ObjectId to string
+    updated_application["_id"] = str(updated_application["_id"])
     
-    return jsonable_encoder({
-        "message": "Application status updated successfully",
-        "updated_application": updated_application
-    })
+    return {"message": "Application status updated", "updated_application": updated_application}
 
-# ✅ Delete Application (DELETE)
+# ✅ 5. Delete Application (Admin)
 @app.delete("/applications/{app_id}")
 async def delete_application(app_id: str):
     try:
@@ -170,3 +162,10 @@ async def delete_application(app_id: str):
         raise HTTPException(status_code=404, detail="Application not found")
 
     return {"message": "Application deleted successfully"}
+
+# ✅ Serve Static Files (Including favicon.ico)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse("static/favicon.ico")
