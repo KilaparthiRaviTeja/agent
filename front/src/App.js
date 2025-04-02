@@ -1,7 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import "./App.css";
-
-const API_URL = "https://agent-rl7n.onrender.com";
 
 const ApplicationForm = () => {
   const [formData, setFormData] = useState({
@@ -9,7 +7,11 @@ const ApplicationForm = () => {
     last_name: "",
     date_of_birth: "",
     ssn_last4: "",
+    household_size: "",
+    income: "",
     address: "",
+    is_enrolled_in_program: false,
+    program_name: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -18,56 +20,41 @@ const ApplicationForm = () => {
   const [showModal, setShowModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const firstNameRef = useRef(null);
-  const ssnRef = useRef(null);
-
-  useEffect(() => {
-    if (firstNameRef.current) {
-      firstNameRef.current.focus();
-    }
-  }, []);
-
+  // Validation function
   const validateForm = () => {
-    let newErrors = {};
+    const newErrors = {};
     if (!formData.first_name.trim()) newErrors.first_name = "First Name is required";
     if (!formData.last_name.trim()) newErrors.last_name = "Last Name is required";
     if (!formData.date_of_birth) newErrors.date_of_birth = "Date of Birth is required";
-    if (!/^\d{4}$/.test(formData.ssn_last4)) newErrors.ssn_last4 = "SSN must be 4 digits (numbers only)";
+    if (!/^\d{4}$/.test(formData.ssn_last4)) newErrors.ssn_last4 = "SSN must be 4 digits";
+    if (!formData.household_size || isNaN(formData.household_size) || formData.household_size < 1 || formData.household_size > 8) {
+      newErrors.household_size = "Household size must be between 1 and 8";
+    }
+    if (!formData.income || isNaN(formData.income) || formData.income <= 0) newErrors.income = "Valid Income is required";
     if (!formData.address.trim()) newErrors.address = "Address is required";
+    if (formData.is_enrolled_in_program && !formData.program_name.trim()) newErrors.program_name = "Program Name is required if enrolled";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // Handle input change
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    if ((name === "first_name" || name === "last_name") && !/^[A-Za-z\s]*$/.test(value)) {
-      return;
-    }
-    if (name === "ssn_last4" && !/^\d*$/.test(value)) {
-      return;
-    }
-
-    setFormData({ ...formData, [name]: value });
-
-    if (errors[name]) {
-      setErrors((prevErrors) => ({ ...prevErrors, [name]: undefined }));
-    }
-
-    if (name === "ssn_last4" && value.length === 4) {
-      ssnRef.current?.blur();
-    }
+    const { name, value, type, checked } = e.target;
+    setFormData({ ...formData, [name]: type === "checkbox" ? checked : value });
   };
 
+  // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validateForm()) {
       setErrorMessage("Please fix the errors before submitting.");
       return;
     }
-    if (!showModal) setShowModal(true);
+    setShowModal(true);
   };
 
+  // Confirm submission to backend
   const confirmSubmission = async () => {
     setShowModal(false);
     setLoading(true);
@@ -75,29 +62,39 @@ const ApplicationForm = () => {
     setErrorMessage("");
 
     try {
-      const res = await fetch(`${API_URL}/applications/`, {
+      const res = await fetch("http://localhost:8000/applications/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || `Error: ${res.status}`);
-      }
-
       const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Something went wrong");
+
+      console.log("API Response:", data); // Debugging: Check response in console
       setResponse(data);
-      setFormData({ first_name: "", last_name: "", date_of_birth: "", ssn_last4: "", address: "" });
     } catch (err) {
-      console.error("Submission Error:", err);
-      setErrorMessage(err.message || "Submission failed. Try again.");
+      setErrorMessage(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const clearSubmission = () => {
+  // Clear form function
+  const handleClear = () => {
+    setFormData({
+      first_name: "",
+      last_name: "",
+      date_of_birth: "",
+      ssn_last4: "",
+      household_size: "",
+      income: "",
+      address: "",
+      is_enrolled_in_program: false,
+      program_name: "",
+    });
+    setErrors({});
+    setErrorMessage("");
     setResponse(null);
   };
 
@@ -106,72 +103,56 @@ const ApplicationForm = () => {
       <div className="container">
         <h2>Application Form</h2>
         <form onSubmit={handleSubmit} className="form">
-          <input
-            ref={firstNameRef}
-            type="text"
-            name="first_name"
-            placeholder="First Name"
-            value={formData.first_name}
-            onChange={handleChange}
-            className={errors.first_name ? "input-error" : ""}
-            required
-          />
+          <input type="text" name="first_name" placeholder="First Name" value={formData.first_name} onChange={handleChange} required />
           {errors.first_name && <p className="error-text">{errors.first_name}</p>}
 
-          <input
-            type="text"
-            name="last_name"
-            placeholder="Last Name"
-            value={formData.last_name}
-            onChange={handleChange}
-            className={errors.last_name ? "input-error" : ""}
-            required
-          />
+          <input type="text" name="last_name" placeholder="Last Name" value={formData.last_name} onChange={handleChange} required />
           {errors.last_name && <p className="error-text">{errors.last_name}</p>}
 
-          <input
-            type="date"
-            name="date_of_birth"
-            value={formData.date_of_birth}
-            onChange={handleChange}
-            className={errors.date_of_birth ? "input-error" : ""}
-            required
-          />
+          <input type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleChange} required />
           {errors.date_of_birth && <p className="error-text">{errors.date_of_birth}</p>}
 
-          <input
-            ref={ssnRef}
-            type="text"
-            name="ssn_last4"
-            placeholder="Last 4 digits of SSN"
-            value={formData.ssn_last4}
-            onChange={handleChange}
-            maxLength={4}
-            pattern="\d{4}"
-            className={errors.ssn_last4 ? "input-error" : ""}
-            required
-          />
+          <input type="text" name="ssn_last4" placeholder="Last 4 digits of SSN" value={formData.ssn_last4} onChange={handleChange} maxLength="4" required />
           {errors.ssn_last4 && <p className="error-text">{errors.ssn_last4}</p>}
 
-          <input
-            type="text"
-            name="address"
-            placeholder="Address"
-            value={formData.address}
-            onChange={handleChange}
-            className={errors.address ? "input-error" : ""}
-            required
-          />
+          <input 
+  type="text" 
+  name="household_size" 
+  placeholder="Number of People in Household (1-9)" 
+  value={formData.household_size} 
+  onChange={handleChange} 
+  maxLength="1" 
+  pattern="[1-9]" 
+  onInput={(e) => e.target.value = e.target.value.replace(/[^1-9]/g, '')} 
+  required 
+/>
+{errors.household_size && <p className="error-text">{errors.household_size}</p>}
+
+
+          <input type="text" name="income" placeholder="Income (in $)" value={formData.income} onChange={handleChange} required />
+          {errors.income && <p className="error-text">{errors.income}</p>}
+
+          <input type="text" name="address" placeholder="Address" value={formData.address} onChange={handleChange} required />
           {errors.address && <p className="error-text">{errors.address}</p>}
 
-          <div className="button-group">
-            <button type="submit" disabled={loading}>
-              {loading ? "Submitting..." : "Submit"}
-            </button>
-            <button type="button" className="clear-button" onClick={clearSubmission}>
-              Clear
-            </button>
+          <div>
+            <label>
+              Are you enrolled in a qualifying government assistance program?
+              <input type="checkbox" name="is_enrolled_in_program" checked={formData.is_enrolled_in_program} onChange={handleChange} />
+            </label>
+            {formData.is_enrolled_in_program && (
+              <div>
+                <input type="text" name="program_name" placeholder="Enter the program name" value={formData.program_name} onChange={handleChange} />
+                {errors.program_name && <p className="error-text">{errors.program_name}</p>}
+              </div>
+            )}
           </div>
+
+          <button type="submit" disabled={loading}>{loading ? "Submitting..." : "Submit"}</button>
+
+          <button type="button" onClick={handleClear} disabled={loading}>Clear</button>
+
+          {errorMessage && <p className="error-text">{errorMessage}</p>}
         </form>
       </div>
 
@@ -179,10 +160,10 @@ const ApplicationForm = () => {
         <h2>Submission Details</h2>
         {response ? (
           <div className="response">
-            <p><strong>Submission Date:</strong> {response.submission_date}</p>
-            <p><strong>Status:</strong> {response.status}</p>
-            <p><strong>Approval ETA:</strong> {response.approval_eta} days</p>
-            <p><strong>Estimated Approval Date:</strong> {response.approval_estimated_date}</p>
+            <p><strong>Submission Date:</strong> {response.submission_date || "Not Available"}</p>
+            <p><strong>Status:</strong> {response.status || "Pending"}</p>
+            <p><strong>Approval ETA:</strong> {response.approval_eta ? `${response.approval_eta} days` : "Not Available"}</p>
+            <p><strong>Estimated Approval Date:</strong> {response.approval_estimated_date || "Not Available"}</p>
             <p><strong>Approval Date:</strong> {response.approval_date || "N/A"}</p>
           </div>
         ) : (
@@ -200,8 +181,6 @@ const ApplicationForm = () => {
           </div>
         </div>
       )}
-
-      {errorMessage && <p className="error-text">{errorMessage}</p>}
     </div>
   );
 };
