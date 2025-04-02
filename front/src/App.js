@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import "./App.css";
-const API_URL = "https://agent-rl7n.onrender.com";
+
 const ApplicationForm = () => {
   const [formData, setFormData] = useState({
     first_name: "",
@@ -112,13 +112,25 @@ const ApplicationForm = () => {
           <input type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleChange} required />
           {errors.date_of_birth && <p className="error-text">{errors.date_of_birth}</p>}
 
-          <input type="text" name="ssn_last4" placeholder="Last 4 digits of SSN" value={formData.ssn_last4} onChange={handleChange} maxLength="4" required />
-          {errors.ssn_last4 && <p className="error-text">{errors.ssn_last4}</p>}
+          <input 
+  type="text" 
+  name="ssn_last4" 
+  placeholder="Last 4 digits of SSN" 
+  value={formData.ssn_last4} 
+  onChange={handleChange} 
+  maxLength="4" 
+  required 
+  onInput={(e) => {
+    e.target.value = e.target.value.replace(/\D/g, ''); // Remove non-numeric characters
+}}/>
+{errors.ssn_last4 && <p className="error-text">{errors.ssn_last4}</p>}
 
-          <input type="text" name="household_size" placeholder="Number of People in Household (1-9)" value={formData.household_size} onChange={handleChange} maxLength="1" pattern="[1-9]" onInput={(e) => e.target.value = e.target.value.replace(/[^1-9]/g, '')} required />
+
+          <input type="number" name="household_size" placeholder="Number of People in Household (1-9)" value={formData.household_size} onChange={handleChange} min="1" max="9" required onInput={(e) => {if (e.target.value.length > 1) e.target.value = e.target.value.slice(0, 1);}} />
           {errors.household_size && <p className="error-text">{errors.household_size}</p>}
 
-          <input type="text" name="income" placeholder="Income (in $)" value={formData.income} onChange={handleChange} required />
+
+          <input type="number" name="income" placeholder="Income (in $)" value={formData.income} onChange={handleChange} required />
           {errors.income && <p className="error-text">{errors.income}</p>}
 
           <input type="text" name="address" placeholder="Address" value={formData.address} onChange={handleChange} required />
