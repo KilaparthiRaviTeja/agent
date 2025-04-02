@@ -15,10 +15,11 @@ const ApplicationForm = () => {
   });
 
   const [errors, setErrors] = useState({});
-  const [response, setResponse] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [response, setResponse] = useState(null);
 
   // Validation function
   const validateForm = () => {
@@ -27,12 +28,16 @@ const ApplicationForm = () => {
     if (!formData.last_name.trim()) newErrors.last_name = "Last Name is required";
     if (!formData.date_of_birth) newErrors.date_of_birth = "Date of Birth is required";
     if (!/^\d{4}$/.test(formData.ssn_last4)) newErrors.ssn_last4 = "SSN must be 4 digits";
-    if (!formData.household_size || isNaN(formData.household_size) || formData.household_size < 1 || formData.household_size > 8) {
-      newErrors.household_size = "Household size must be between 1 and 8";
+    if (!formData.household_size || isNaN(formData.household_size) || formData.household_size < 1 || formData.household_size > 9) {
+      newErrors.household_size = "Household size must be between 1 and 9";
     }
-    if (!formData.income || isNaN(formData.income) || formData.income <= 0) newErrors.income = "Valid Income is required";
+    if (!formData.income || isNaN(formData.income) || formData.income <= 0) {
+      newErrors.income = "Income must be a valid number greater than 0";
+    }
     if (!formData.address.trim()) newErrors.address = "Address is required";
-    if (formData.is_enrolled_in_program && !formData.program_name.trim()) newErrors.program_name = "Program Name is required if enrolled";
+    if (formData.is_enrolled_in_program && !formData.program_name.trim()) {
+      newErrors.program_name = "Program Name is required if enrolled";
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -41,16 +46,28 @@ const ApplicationForm = () => {
   // Handle input change
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    if (name === "household_size" || name === "income") {
+      if (!/^\d*$/.test(value)) return;
+    }
+
     setFormData({ ...formData, [name]: type === "checkbox" ? checked : value });
   };
 
   // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    if (hasSubmitted) {
+      alert("You have already submitted the application!");
+      return;
+    }
+
     if (!validateForm()) {
       setErrorMessage("Please fix the errors before submitting.");
       return;
     }
+
     setShowModal(true);
   };
 
@@ -60,9 +77,10 @@ const ApplicationForm = () => {
     setLoading(true);
     setErrors({});
     setErrorMessage("");
+    setHasSubmitted(true);
 
     try {
-      const res = await fetch("https://agent-rl7n.onrender.com/applications/", {
+      const res = await fetch("http://localhost:8000/applications/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -71,7 +89,7 @@ const ApplicationForm = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Something went wrong");
 
-      console.log("API Response:", data); // Debugging: Check response in console
+      console.log("API Response:", data);
       setResponse(data);
     } catch (err) {
       setErrorMessage(err.message);
@@ -96,6 +114,7 @@ const ApplicationForm = () => {
     setErrors({});
     setErrorMessage("");
     setResponse(null);
+    setHasSubmitted(false);
   };
 
   return (
@@ -113,24 +132,36 @@ const ApplicationForm = () => {
           {errors.date_of_birth && <p className="error-text">{errors.date_of_birth}</p>}
 
           <input 
-  type="text" 
-  name="ssn_last4" 
-  placeholder="Last 4 digits of SSN" 
-  value={formData.ssn_last4} 
-  onChange={handleChange} 
-  maxLength="4" 
-  required 
-  onInput={(e) => {
-    e.target.value = e.target.value.replace(/\D/g, ''); // Remove non-numeric characters
-}}/>
-{errors.ssn_last4 && <p className="error-text">{errors.ssn_last4}</p>}
+            type="text" 
+            name="ssn_last4" 
+            placeholder="Last 4 digits of SSN" 
+            value={formData.ssn_last4} 
+            onChange={handleChange} 
+            maxLength="4" 
+            required 
+            onInput={(e) => { e.target.value = e.target.value.replace(/\D/g, ''); }} 
+          />
+          {errors.ssn_last4 && <p className="error-text">{errors.ssn_last4}</p>}
 
-
-          <input type="number" name="household_size" placeholder="Number of People in Household (1-9)" value={formData.household_size} onChange={handleChange} min="1" max="9" required onInput={(e) => {if (e.target.value.length > 1) e.target.value = e.target.value.slice(0, 1);}} />
+          <input 
+            type="text" 
+            name="household_size" 
+            placeholder="Household Size (1-9)" 
+            value={formData.household_size} 
+            onChange={handleChange} 
+            maxLength="1" 
+            required
+          />
           {errors.household_size && <p className="error-text">{errors.household_size}</p>}
 
-
-          <input type="number" name="income" placeholder="Income (in $)" value={formData.income} onChange={handleChange} required />
+          <input 
+            type="text" 
+            name="income" 
+            placeholder="Income ($)" 
+            value={formData.income} 
+            onChange={handleChange} 
+            required 
+          />
           {errors.income && <p className="error-text">{errors.income}</p>}
 
           <input type="text" name="address" placeholder="Address" value={formData.address} onChange={handleChange} required />
@@ -149,8 +180,7 @@ const ApplicationForm = () => {
             )}
           </div>
 
-          <button type="submit" disabled={loading}>{loading ? "Submitting..." : "Submit"}</button>
-
+          <button type="submit" disabled={loading || hasSubmitted}>{loading ? "Submitting..." : hasSubmitted ? "Submitted" : "Submit"}</button> 
           <button type="button" onClick={handleClear} disabled={loading}>Clear</button>
 
           {errorMessage && <p className="error-text">{errorMessage}</p>}
@@ -158,19 +188,20 @@ const ApplicationForm = () => {
       </div>
 
       <div className="submission-details">
-        <h2>Submission Details</h2>
-        {response ? (
-          <div className="response">
-            <p><strong>Submission Date:</strong> {response.submission_date || "Not Available"}</p>
-            <p><strong>Status:</strong> {response.status || "Pending"}</p>
-            <p><strong>Approval ETA:</strong> {response.approval_eta ? `${response.approval_eta} days` : "Not Available"}</p>
-            <p><strong>Estimated Approval Date:</strong> {response.approval_estimated_date || "Not Available"}</p>
-            <p><strong>Approval Date:</strong> {response.approval_date || "N/A"}</p>
-          </div>
-        ) : (
-          <p>No submissions yet.</p>
-        )}
-      </div>
+  <h2>Submission Details</h2>
+  {response ? (
+    <div className="response">
+      <p><strong>Submission Date:</strong> {response.submission_date || "Not Available"}</p>
+      <p><strong>Status:</strong> {response.status || "Pending"}</p>
+      <p><strong>Approval ETA:</strong> {response.approval_eta ? `${response.approval_eta} days` : "Not Available"}</p>
+      <p><strong>Estimated Approval Date:</strong> {response.approval_estimated_date || "Not Available"}</p>
+      <p><strong>Approval Date:</strong> {response.approval_date || "N/A"}</p>
+    </div>
+  ) : (
+    <p>No submissions yet.</p>
+  )}
+</div>
+
 
       {showModal && (
         <div className="modal">
