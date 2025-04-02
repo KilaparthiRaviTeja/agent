@@ -115,19 +115,8 @@ const ApplicationForm = () => {
           <input type="text" name="ssn_last4" placeholder="Last 4 digits of SSN" value={formData.ssn_last4} onChange={handleChange} maxLength="4" required />
           {errors.ssn_last4 && <p className="error-text">{errors.ssn_last4}</p>}
 
-          <input 
-  type="text" 
-  name="household_size" 
-  placeholder="Number of People in Household (1-9)" 
-  value={formData.household_size} 
-  onChange={handleChange} 
-  maxLength="1" 
-  pattern="[1-9]" 
-  onInput={(e) => e.target.value = e.target.value.replace(/[^1-9]/g, '')} 
-  required 
-/>
-{errors.household_size && <p className="error-text">{errors.household_size}</p>}
-
+          <input type="text" name="household_size" placeholder="Number of People in Household (1-9)" value={formData.household_size} onChange={handleChange} maxLength="1" pattern="[1-9]" onInput={(e) => e.target.value = e.target.value.replace(/[^1-9]/g, '')} required />
+          {errors.household_size && <p className="error-text">{errors.household_size}</p>}
 
           <input type="text" name="income" placeholder="Income (in $)" value={formData.income} onChange={handleChange} required />
           {errors.income && <p className="error-text">{errors.income}</p>}
